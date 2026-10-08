@@ -20,7 +20,8 @@
 - OpenClaw bridge
 
 ## Phase 3 — AI platform
-- Gemini / Anthropic native providers
+- Gemini / Anthropic native providers — implemented
+- Mistral OpenAI-compatible provider — implemented
 - MCP
 - durable agent profiles
 - teams / delegation

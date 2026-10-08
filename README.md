@@ -9,8 +9,9 @@ This is the main PC implementation of the AI-first messenger concept. Windows is
 - .NET 10 + WPF desktop client
 - MVVM via CommunityToolkit.Mvvm
 - SQLite workspace persistence
-- OpenAI-compatible AI provider abstraction
+- OpenAI-compatible AI provider abstraction (OpenAI / DeepSeek / Mistral)
 - Gemini Interactions API client
+- Native Anthropic Messages API client (Claude Sonnet 5.5)
 - Native structured tool-calling loop
 - SAFE / CONFIRM tool policy
 - Persistent approval center

@@ -21,6 +21,7 @@ public partial class App : Application
 
                 services.AddSingleton<OpenAiCompatibleProvider>();
                 services.AddSingleton<GeminiInteractionsProvider>();
+                services.AddSingleton<AnthropicMessagesProvider>();
                 services.AddSingleton<OpenClawBridge>();
                 services.AddSingleton<IAiProvider, AiProviderRouter>();
 
