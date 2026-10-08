@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AIMessenger.Desktop/AIMessenger.Desktop.csproj" />
+  </Folder>
+</Solution>

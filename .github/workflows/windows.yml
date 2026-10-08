@@ -1,0 +1,23 @@
+name: windows-build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore AI-Messenger-PC.slnx
+
+      - name: Build
+        run: dotnet build AI-Messenger-PC.slnx --configuration Release --no-restore
