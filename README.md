@@ -9,19 +9,45 @@ This is the main PC implementation of the AI-first messenger concept. Windows is
 - .NET 10 + WPF desktop client
 - MVVM via CommunityToolkit.Mvvm
 - SQLite workspace persistence
-- Provider abstraction for OpenAI-compatible APIs
+- OpenAI-compatible AI provider abstraction
+- Gemini Interactions API client
 - Native structured tool-calling loop
-- Tool risk classification
-- FlaUI 5 UI Automation bridge (UIA2 + UIA3)
+- SAFE / CONFIRM tool policy
+- Persistent approval center
+- Workspace file read/write tools with repository boundary
+- Windows process/window inspection
+- FlaUI UI Automation bridge
+- OpenClaw CLI/Hub bridge with embedded fallback
 - Hermes Agent integration point
-- OpenClaw / Windows Hub integration point
-- Local API-key discovery from a Desktop-only secret file or environment variables
-- Activity logging
+- Local Desktop API-key file discovery plus environment-variable support
+- Activity/audit logging
+
+## Desktop execution stack
+
+Messenger UI
+  -> Agent Runtime
+  -> Tool Registry / approval policy
+  -> FlaUI / OpenClaw
+  -> Windows applications
 
 ## Security
 
 Real API keys stay outside Git. AI-Messenger-API-Keys.txt is excluded by .gitignore.
 
+The messenger does not bypass OpenClaw Gateway authentication. It uses the Gateway when credentials are available and otherwise exposes OpenClaw's documented embedded agent exec fallback.
+
 ## Roadmap
 
-Provider-native Gemini/Anthropic clients, approval center, MCP registry, richer UI Automation actions, OpenClaw bridge, memory/RAG, attachments, scheduler, agent-to-agent protocol, Android #21 sync, GitHub/CI workflows, packaging.
+- MCP client + registry
+- native Anthropic provider
+- durable agent profiles
+- agent teams/delegation
+- richer UI Automation actions
+- terminal/process tool with command policy
+- memory/RAG
+- attachments
+- scheduler/autonomous tasks
+- agent-to-agent protocol
+- Android #21 synchronization
+- GitHub / CI agent workflows
+- packaging and installer

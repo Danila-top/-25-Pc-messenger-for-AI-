@@ -18,8 +18,10 @@ public partial class App : Application
             .ConfigureServices((_, services) =>
             {
                 services.AddSingleton(new System.Net.Http.HttpClient());
+
                 services.AddSingleton<OpenAiCompatibleProvider>();
                 services.AddSingleton<GeminiInteractionsProvider>();
+                services.AddSingleton<OpenClawBridge>();
                 services.AddSingleton<IAiProvider, AiProviderRouter>();
 
                 services.AddSingleton<SecretStore>();
@@ -37,8 +39,11 @@ public partial class App : Application
         StartupEventArgs e)
     {
         await Host.StartAsync();
+
         var window = Host.Services.GetRequiredService<MainWindow>();
+
         await window.InitializeAsync();
+
         window.Show();
     }
 

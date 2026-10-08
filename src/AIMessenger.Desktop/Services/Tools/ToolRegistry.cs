@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.IO;
+using System.Text;
 using System.Text.Json;
 using AIMessenger.Desktop.Models;
 using AIMessenger.Desktop.Services.Automation;
@@ -7,6 +9,9 @@ namespace AIMessenger.Desktop.Services.Tools;
 
 public sealed class ToolRegistry(FlaUiAutomationService ui)
 {
+    private readonly string _workspaceRoot =
+        Path.GetFullPath(@"C:\AI\PcMessenger");
+
     private static readonly JsonElement EmptyObjectSchema =
         JsonSerializer.Deserialize<JsonElement>(
             """{"type":"object","properties":{},"additionalProperties":false}""");
@@ -18,21 +23,49 @@ public sealed class ToolRegistry(FlaUiAutomationService ui)
             "Evaluate a basic arithmetic expression. No code execution.",
             JsonSerializer.Deserialize<JsonElement>(
                 """{"type":"object","properties":{"expression":{"type":"string"}},"required":["expression"],"additionalProperties":false}""")),
+
+        new(
+            "workspace_read",
+            "Read a UTF-8 text file inside the AI Messenger repository workspace.",
+            JsonSerializer.Deserialize<JsonElement>(
+                """{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}""")),
+
+        new(
+            "workspace_write",
+            "Write a UTF-8 text file inside the AI Messenger repository workspace.",
+            JsonSerializer.Deserialize<JsonElement>(
+                """{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"],"additionalProperties":false}"""),
+            ToolRisk.Confirm),
+
         new(
             "open_url",
             "Open an http/https URL using the default Windows browser.",
             JsonSerializer.Deserialize<JsonElement>(
                 """{"type":"object","properties":{"url":{"type":"string"}},"required":["url"],"additionalProperties":false}"""),
             ToolRisk.Confirm),
+
         new(
             "list_windows",
             "List visible top-level Windows windows with process IDs and titles.",
             EmptyObjectSchema),
+
         new(
             "inspect_window",
             "Inspect the semantic UI Automation tree of a Windows window by title substring.",
             JsonSerializer.Deserialize<JsonElement>(
-                """{"type":"object","properties":{"titleContains":{"type":"string"},"depth":{"type":"integer","minimum":0,"maximum":4}},"required":["titleContains"],"additionalProperties":false}"""))
+                """{"type":"object","properties":{"titleContains":{"type":"string"},"depth":{"type":"integer","minimum":0,"maximum":4}},"required":["titleContains"],"additionalProperties":false}""")),
+
+        new(
+            "list_processes",
+            "List running Windows processes with PID and process name.",
+            EmptyObjectSchema),
+
+        new(
+            "openclaw_agent",
+            "Run a turn through the locally installed OpenClaw Gateway using its configured agent and capabilities.",
+            JsonSerializer.Deserialize<JsonElement>(
+                """{"type":"object","properties":{"message":{"type":"string"},"agent":{"type":"string"}},"required":["message"],"additionalProperties":false}"""),
+            ToolRisk.Confirm)
     ];
 
     public Task<string> ExecuteAsync(
@@ -48,25 +81,53 @@ public sealed class ToolRegistry(FlaUiAutomationService ui)
             {
                 "calculator" =>
                     Task.FromResult(
-                        Calculate(root.GetProperty("expression").GetString() ?? string.Empty)),
+                        Calculate(
+                            root.GetProperty("expression").GetString()
+                            ?? string.Empty)),
+
+                "workspace_read" =>
+                    Task.FromResult(
+                        ReadWorkspaceFile(
+                            root.GetProperty("path").GetString()
+                            ?? string.Empty)),
+
+                "workspace_write" =>
+                    Task.FromResult(
+                        WriteWorkspaceFile(
+                            root.GetProperty("path").GetString()
+                            ?? string.Empty,
+                            root.GetProperty("content").GetString()
+                            ?? string.Empty)),
+
                 "open_url" =>
                     Task.FromResult(
-                        OpenUrl(root.GetProperty("url").GetString() ?? string.Empty)),
+                        OpenUrl(
+                            root.GetProperty("url").GetString()
+                            ?? string.Empty)),
+
                 "list_windows" =>
                     Task.FromResult(ListWindows()),
+
                 "inspect_window" =>
                     Task.FromResult(
                         ui.DescribeTree(
-                            root.GetProperty("titleContains").GetString() ?? string.Empty,
+                            root.GetProperty("titleContains").GetString()
+                            ?? string.Empty,
                             root.TryGetProperty("depth", out var depth)
                                 ? depth.GetInt32()
                                 : 2)),
-                _ => Task.FromResult($"Unknown tool: {call.Name}")
+
+                "list_processes" =>
+                    Task.FromResult(ListProcesses()),
+
+                _ =>
+                    Task.FromResult($"Unknown tool: {call.Name}")
             };
         }
         catch (Exception ex)
         {
-            return Task.FromResult($"Tool error: {ex.Message}");
+            return Task.FromResult(
+                $"Tool error: {ex.Message}");
         }
     }
 
@@ -78,11 +139,15 @@ public sealed class ToolRegistry(FlaUiAutomationService ui)
         if (expression.Any(ch =>
                 !char.IsDigit(ch) &&
                 !" +-*/().%".Contains(ch)))
+        {
             return "Only arithmetic characters are allowed.";
+        }
 
         try
         {
-            var value = new System.Data.DataTable().Compute(expression, null);
+            var value = new System.Data.DataTable()
+                .Compute(expression, null);
+
             return Convert.ToDouble(
                     value,
                     System.Globalization.CultureInfo.InvariantCulture)
@@ -96,11 +161,73 @@ public sealed class ToolRegistry(FlaUiAutomationService ui)
         }
     }
 
+    private string ReadWorkspaceFile(string relativePath)
+    {
+        var fullPath = ResolveWorkspacePath(relativePath);
+
+        if (!File.Exists(fullPath))
+            return $"File not found: {relativePath}";
+
+        var content = File.ReadAllText(fullPath);
+
+        if (content.Length > 20000)
+            content = content[..20000] + Environment.NewLine + "[truncated]";
+
+        return content;
+    }
+
+    private string WriteWorkspaceFile(
+        string relativePath,
+        string content)
+    {
+        var fullPath = ResolveWorkspacePath(relativePath);
+        Directory.CreateDirectory(
+            Path.GetDirectoryName(fullPath)!);
+
+        File.WriteAllText(fullPath, content);
+
+        return $"Wrote {relativePath} ({content.Length} chars).";
+    }
+
+    private string ResolveWorkspacePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            throw new ArgumentException("Path is empty.");
+
+        var fullPath = Path.GetFullPath(
+            Path.Combine(_workspaceRoot, relativePath));
+
+        var rootWithSeparator =
+            _workspaceRoot.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        if (!fullPath.StartsWith(
+                rootWithSeparator,
+                StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(
+                fullPath,
+                _workspaceRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new UnauthorizedAccessException(
+                "Path escapes the repository workspace.");
+        }
+
+        return fullPath;
+    }
+
     private static string OpenUrl(string url)
     {
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+        if (!Uri.TryCreate(
+                url,
+                UriKind.Absolute,
+                out var uri) ||
             uri.Scheme is not ("http" or "https"))
+        {
             return "Only http/https URLs are allowed.";
+        }
 
         Process.Start(
             new ProcessStartInfo(uri.ToString())
@@ -116,4 +243,31 @@ public sealed class ToolRegistry(FlaUiAutomationService ui)
             Environment.NewLine,
             ui.ListWindows().Select(
                 x => $"{x.ProcessId}	{x.ProcessName}	{x.Title}"));
+
+    private static string ListProcesses()
+    {
+        var builder = new StringBuilder();
+
+        foreach (var process in Process.GetProcesses()
+                     .OrderBy(x => x.ProcessName)
+                     .Take(500))
+        {
+            try
+            {
+                builder.Append(process.Id);
+                builder.Append('	');
+                builder.AppendLine(process.ProcessName);
+            }
+            catch
+            {
+                // A process can exit while being inspected.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+
+        return builder.ToString();
+    }
 }
